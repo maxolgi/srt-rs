@@ -4,8 +4,9 @@ mod encapsulate;
 
 use std::{
     convert::TryFrom,
-    time::{Duration, Instant},
+    time::Duration,
 };
+use web_time::Instant;
 
 use bytes::Bytes;
 

@@ -5,8 +5,9 @@ mod time;
 
 use std::{
     ops::RangeInclusive,
-    time::{Duration, Instant},
+    time::Duration,
 };
+use web_time::Instant;
 
 use arq::AutomaticRepeatRequestAlgorithm;
 
@@ -86,6 +87,22 @@ impl Receiver {
     pub fn rx_acknowledged_time(&self) -> Duration {
         self.arq.rx_acknowledged_time()
     }
+
+    pub fn rtt(&self) -> Duration {
+        self.arq.rtt()
+    }
+
+    pub fn bandwidth_bps(&self) -> u64 {
+        self.arq.bandwidth_bps()
+    }
+
+    pub fn buffered_packets(&self) -> usize {
+        self.arq.buffered_packets()
+    }
+
+    pub fn buffer_available_packets(&self) -> usize {
+        self.arq.buffer_available_packets()
+    }
 }
 
 pub struct ReceiverContext<'a> {
@@ -148,6 +165,9 @@ impl<'a> ReceiverContext<'a> {
                 use DataPacketAction::*;
                 match action {
                     ReceivedWithLoss(loss_list) => {
+                        let lost = loss_list.iter_decompressed().count() as u64;
+                        self.stats.rx_loss_data += lost;
+                        self.stats.rx_loss_bytes += lost * bytes;
                         self.output.send_control(now, Nak(loss_list));
                     }
                     ReceivedWithLightAck { light_ack, .. } => {

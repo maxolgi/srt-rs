@@ -1,7 +1,8 @@
 use std::{
     cmp::max,
-    time::{Duration, Instant},
+    time::Duration,
 };
+use web_time::Instant;
 
 use crate::options::{
     ByteCount, DataRate, LiveBandwidthMode, PacketCount, PacketPeriod, PacketRate, Percent,

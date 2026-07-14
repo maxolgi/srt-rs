@@ -3,8 +3,8 @@
 use std::{
     cmp::{max, min},
     net::SocketAddr,
-    time::Instant,
 };
+use web_time::Instant;
 
 use crate::{connection::ConnectionSettings, options::*, packet::*, settings::*};
 

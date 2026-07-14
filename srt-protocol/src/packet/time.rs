@@ -4,9 +4,10 @@ use std::{
     fmt,
     num::Wrapping,
     ops::{Add, Div, Mul, Neg, Sub},
-    time::{Duration, Instant},
+    time::Duration,
     u32,
 };
+use web_time::Instant;
 
 /// Timestamp in us after creation
 /// These wrap every 2^32 microseconds
@@ -252,7 +253,7 @@ impl Add<TimeSpan> for Instant {
             self + Duration::from_micros(micros as u64)
         } else {
             self.checked_sub(Duration::from_micros(micros.unsigned_abs()))
-                .unwrap()
+                .unwrap_or(self)
         }
     }
 }
@@ -263,10 +264,10 @@ impl Sub<TimeSpan> for Instant {
     fn sub(self, rhs: TimeSpan) -> Self::Output {
         let micros = rhs.as_micros() as i64;
         if micros > 0 {
-            self + Duration::from_micros(micros as u64)
+            self.checked_sub(Duration::from_micros(micros as u64))
+                .unwrap_or(self)
         } else {
-            self.checked_sub(Duration::from_micros(micros.unsigned_abs()))
-                .unwrap()
+            self + Duration::from_micros(micros.unsigned_abs())
         }
     }
 }

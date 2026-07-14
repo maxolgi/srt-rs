@@ -1,8 +1,8 @@
 use std::io::ErrorKind;
 use std::{
     net::{IpAddr, SocketAddr},
-    time::Instant,
 };
+use web_time::Instant;
 
 use log::info;
 use ConnectError::*;

@@ -2,7 +2,8 @@ mod input;
 mod session;
 mod statistics;
 
-use std::{collections::HashMap, fmt::Debug, net::SocketAddr, time::Duration, time::Instant};
+use std::{collections::HashMap, fmt::Debug, net::SocketAddr, time::Duration};
+use web_time::Instant;
 
 use crate::{packet::*, protocol::time::Timer, settings::ConnInitSettings};
 

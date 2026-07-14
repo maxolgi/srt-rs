@@ -1,7 +1,8 @@
 use std::{
     collections::VecDeque,
-    time::{Duration, Instant},
+    time::Duration,
 };
+use web_time::Instant;
 
 use crate::packet::{FullAckSeqNumber, SeqNumber, TimeSpan};
 

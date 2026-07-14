@@ -8,8 +8,9 @@ pub use timer::*;
 
 use std::{
     cmp::{max, min},
-    time::{Duration, Instant},
+    time::Duration,
 };
+use web_time::Instant;
 
 //   The recommended granularity of their periods is microseconds. The
 //   system time is queried after each time bounded UDP receiving (there

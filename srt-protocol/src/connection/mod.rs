@@ -6,8 +6,9 @@ use std::{
     fmt::Debug,
     io,
     net::SocketAddr,
-    time::{Duration, Instant},
+    time::Duration,
 };
+use web_time::Instant;
 
 use bytes::Bytes;
 
@@ -88,6 +89,8 @@ pub struct DuplexConnection {
     sender: Sender,
     receiver: Receiver,
     stats: SocketStatistics,
+    prev_rx_bytes: u64,
+    prev_stats_time: Instant,
     status: ConnectionStatus,
 }
 
@@ -127,6 +130,8 @@ impl DuplexConnection {
                 settings.peer_idle_timeout,
             ),
             stats: SocketStatistics::new(),
+            prev_rx_bytes: 0,
+            prev_stats_time: settings.socket_start_time,
             receiver: Receiver::new(settings.clone()),
             sender: Sender::new(settings),
         }
@@ -173,6 +178,18 @@ impl DuplexConnection {
         self.stats.tx_buffered_bytes = self.sender.tx_buffered_bytes();
 
         self.stats.rx_acknowledged_time = self.receiver.rx_acknowledged_time();
+        self.stats.rx_average_rtt = self.receiver.rtt();
+        self.stats.rx_acknowledged_data = self.receiver.buffered_packets() as u64;
+        self.stats.rx_buffer_available_bytes =
+            self.receiver.buffer_available_packets() as u64 * 1316;
+
+        let dt = (now - self.prev_stats_time).as_secs_f64();
+        if dt > 0.0 {
+            let delta = self.stats.rx_bytes.saturating_sub(self.prev_rx_bytes);
+            self.stats.rx_bandwidth = (delta as f64 * 8.0 / dt) as u64;
+        }
+        self.prev_rx_bytes = self.stats.rx_bytes;
+        self.prev_stats_time = now;
     }
 
     pub fn next_packet(&mut self, now: Instant) -> Option<(Packet, SocketAddr)> {
@@ -213,7 +230,6 @@ impl DuplexConnection {
                 Some(data)
             }
             Err(error) => {
-                self.warn(now, "output", &error);
                 let dropped = error.too_late_packets.end - error.too_late_packets.start;
                 self.stats.rx_dropped_data += dropped as u64;
                 None
@@ -320,8 +336,6 @@ impl DuplexConnection {
     }
 
     fn handle_packet(&mut self, now: Instant, (packet, from): (Packet, SocketAddr)) {
-        // TODO: record/report packets from invalid hosts?
-        // We don't care about packets from elsewhere
         if from != self.settings.remote {
             self.info(now, "invalid address", &(packet, from));
             return;

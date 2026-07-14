@@ -1,7 +1,8 @@
 use std::{
     ops::Range,
-    time::{Duration, Instant},
+    time::Duration,
 };
+use web_time::Instant;
 
 use array_init::from_iter;
 use arraydeque::{behavior::Wrapping, ArrayDeque};
@@ -198,6 +199,25 @@ impl AutomaticRepeatRequestAlgorithm {
             && self
                 .ack_history_window
                 .is_finished(self.receive_buffer.next_ack_dsn())
+    }
+
+    pub fn rtt(&self) -> Duration {
+        self.rtt.mean_as_duration()
+    }
+
+    pub fn bandwidth_bps(&self) -> u64 {
+        self.arrival_speed
+            .calculate()
+            .map(|(_, bytes_per_sec)| bytes_per_sec as u64 * 8)
+            .unwrap_or(0)
+    }
+
+    pub fn buffered_packets(&self) -> usize {
+        self.receive_buffer.len()
+    }
+
+    pub fn buffer_available_packets(&self) -> usize {
+        self.receive_buffer.buffer_available()
     }
 
     pub fn unacked_packet_count(&self) -> u32 {

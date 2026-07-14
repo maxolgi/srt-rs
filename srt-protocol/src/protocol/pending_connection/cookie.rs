@@ -2,8 +2,8 @@ use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
     net::SocketAddr,
-    time::{SystemTime, UNIX_EPOCH},
 };
+use web_time::{SystemTime, UNIX_EPOCH};
 
 pub fn gen_cookie(saddr: &SocketAddr) -> i32 {
     let time_mins = SystemTime::now()

@@ -1,4 +1,5 @@
-use std::{cmp::Ordering, io::ErrorKind, net::SocketAddr, time::Instant};
+use std::{cmp::Ordering, io::ErrorKind, net::SocketAddr};
+use web_time::Instant;
 
 use log::{debug, info};
 

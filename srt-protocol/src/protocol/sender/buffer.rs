@@ -186,6 +186,11 @@ impl SendBuffer {
     }
 
     fn send_next_packet(&mut self, ts_now: TimeStamp) -> Option<DataPacket> {
+        if let Some(front) = self.front_packet() {
+            if self.next_send.0 < front.0 {
+                self.next_send = front;
+            }
+        }
         let packet_to_send = self.send_packet(ts_now, self.next_send)?;
         self.next_send += 1; // increment after send_packet, which can return None
         Some(packet_to_send)
@@ -221,7 +226,12 @@ impl SendBuffer {
     // All packets that are sent go through this function
     // It records transmit count and sets the per entry RTO timer
     fn send_packet(&mut self, ts_now: TimeStamp, seq_number: SeqNumber) -> Option<DataPacket> {
-        let index = seq_number - self.front_packet()?;
+        let front = self.front_packet()?;
+        let index = if seq_number.0 >= front.0 {
+            seq_number.0 - front.0
+        } else {
+            return None;
+        };
         let entry = self.buffer.get_mut(index as usize)?;
 
         // RTT + 4 * RTTVar + 2 * SYN
@@ -305,9 +315,15 @@ impl SendBuffer {
     }
 
     fn number_of_unacked_packets(&self) -> usize {
-        self.buffer
-            .front()
-            .map_or(0, |e| self.next_send - e.packet.seq_number) as usize
+        self.buffer.front().map_or(0, |e| {
+            let front = e.packet.seq_number.0;
+            let next = self.next_send.0;
+            if next > front {
+                (next - front) as usize
+            } else {
+                0
+            }
+        })
     }
 
     fn pop_lost_list(&mut self) -> Option<SeqNumber> {
@@ -566,7 +582,8 @@ impl<'a> Iterator for SenderAlgorithmIterator<'a> {
 mod test {
     use super::*;
 
-    use std::time::{Duration, Instant};
+    use std::time::{Duration};
+    use web_time::Instant;
 
     use assert_matches::assert_matches;
     use bytes::Bytes;

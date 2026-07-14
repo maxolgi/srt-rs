@@ -1,4 +1,5 @@
-use std::{convert::TryInto, net::SocketAddr, time::Instant};
+use std::{convert::TryInto, net::SocketAddr};
+use web_time::Instant;
 
 use crate::{packet::*, protocol::handshake::Handshake, settings::*};
 
