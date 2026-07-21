@@ -67,6 +67,47 @@ impl Connect {
         }
     }
 
+    /// Creates a connector that skips the Induction phase and sends a Conclusion
+    /// handshake directly. Used over WebTransport where TLS provides authentication
+    /// and DoS protection, making the SRT cookie exchange redundant. Saves one RTT
+    /// compared to the standard 4-packet HSv5 handshake.
+    ///
+    /// The first `handle_tick` emits the Conclusion packet (not Induction).
+    pub fn new_skip_induction(
+        remote: SocketAddr,
+        local_addr: IpAddr,
+        init_settings: ConnInitSettings,
+        streamid: Option<String>,
+        starting_send_seqnum: SeqNumber,
+        now: Instant,
+    ) -> Self {
+        let (hsv5, cm) = start_hsv5_initiation(init_settings.clone(), streamid.clone(), now);
+
+        let packet = Packet::Control(ControlPacket {
+            dest_sockid: SocketId(0),
+            timestamp: TimeStamp::from_micros(0),
+            control_type: ControlTypes::Handshake(HandshakeControlInfo {
+                init_seq_num: starting_send_seqnum,
+                max_packet_size: init_settings.max_packet_size,
+                max_flow_size: init_settings.max_flow_size,
+                socket_id: init_settings.local_sockid,
+                shake_type: ShakeType::Conclusion,
+                peer_addr: local_addr,
+                syn_cookie: 0,
+                info: hsv5,
+            }),
+        });
+
+        Connect {
+            remote,
+            local_addr,
+            init_settings,
+            state: ConclusionResponseWait(packet, cm),
+            streamid,
+            starting_send_seqnum,
+        }
+    }
+
     fn on_start(&mut self) -> ConnectionResult {
         let packet = Packet::Control(ControlPacket {
             dest_sockid: SocketId(0),
@@ -307,5 +348,46 @@ mod test {
             sid,
             random(),
         )
+    }
+
+    #[test]
+    fn skip_induction_sends_conclusion_on_tick() {
+        let mut c = Connect::new_skip_induction(
+            test_remote(),
+            [127, 0, 0, 1].into(),
+            ConnInitSettings {
+                local_sockid: TEST_SOCKID,
+                key_settings: None,
+                key_refresh: Default::default(),
+                send_latency: Duration::from_millis(20),
+                recv_latency: Duration::from_millis(20),
+                bandwidth: Default::default(),
+                statistics_interval: Duration::from_secs(1),
+                recv_buffer_size: options::PacketCount(8192),
+                send_buffer_size: options::PacketCount(8192),
+                max_packet_size: options::PacketSize(1500),
+                max_flow_size: options::PacketCount(8192),
+                peer_idle_timeout: Duration::from_secs(5),
+                too_late_packet_drop: true,
+            },
+            None,
+            random(),
+            Instant::now(),
+        );
+
+        // First tick should emit a Conclusion directly (not Induction).
+        let resp = c.handle_tick(Instant::now());
+        assert_matches!(
+            resp,
+            ConnectionResult::SendPacket((Packet::Control(ControlPacket {
+                control_type: ControlTypes::Handshake(HandshakeControlInfo {
+                    shake_type: ShakeType::Conclusion,
+                    syn_cookie: 0,
+                    socket_id,
+                    ..
+                }),
+                ..
+            }), _)) if socket_id == TEST_SOCKID
+        );
     }
 }
