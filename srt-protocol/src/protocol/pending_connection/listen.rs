@@ -17,6 +17,7 @@ pub struct Listen {
     init_settings: ConnInitSettings,
     state: ListenState,
     enable_access_control: bool,
+    allow_skip_induction: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -46,7 +47,16 @@ impl Listen {
             state: InductionWait,
             init_settings,
             enable_access_control,
+            allow_skip_induction: false,
         }
+    }
+
+    /// When enabled, the listener accepts a Conclusion handshake directly,
+    /// skipping the Induction phase. Used over WebTransport where TLS already
+    /// provides the DoS protection that the SRT cookie mechanism is designed for.
+    pub fn allow_skip_induction(&mut self, allow: bool) -> &mut Self {
+        self.allow_skip_induction = allow;
+        self
     }
 
     pub fn settings(&self) -> &ConnInitSettings {
@@ -168,7 +178,41 @@ impl Listen {
                 });
                 SendPacket((induction_response, from))
             }
-            _ => NotHandled(ConnectError::InductionExpected(shake)),
+            _ => match self.allow_skip_induction {
+                true => {
+                    // Skip-induction: WebTransport provides TLS-level DoS
+                    // protection, so the cookie exchange is unnecessary.
+                    // Synthesize post-induction state and delegate to the
+                    // existing conclusion handler. The cookie check in
+                    // wait_for_conclusion passes trivially because we set
+                    // state.cookie to whatever the peer sent (0 for skip-
+                    // induction initiators).
+                    let state = ConclusionWaitState {
+                        from,
+                        cookie: shake.syn_cookie,
+                        induction_response: Packet::Control(ControlPacket {
+                            timestamp,
+                            dest_sockid: shake.socket_id,
+                            control_type: ControlTypes::Handshake(HandshakeControlInfo {
+                                syn_cookie: shake.syn_cookie,
+                                socket_id: self.init_settings.local_sockid,
+                                ..shake.clone()
+                            }),
+                        }),
+                        induction_time: now,
+                    };
+                    self.state = ConclusionWait(state.clone());
+                    self.wait_for_conclusion(
+                        now,
+                        from,
+                        self.init_settings.local_sockid,
+                        timestamp,
+                        state,
+                        shake,
+                    )
+                }
+                false => NotHandled(ConnectError::InductionExpected(shake)),
+            },
         }
     }
 
@@ -481,6 +525,55 @@ mod test {
                 conn_addr()
             ))),
             NotHandled(ConnectError::InductionExpected(s)) if s == shake
+        );
+    }
+
+    #[test]
+    fn skip_induction_accepts_conclusion() {
+        let mut l = Listen::new(ConnInitSettings::default(), false);
+        l.allow_skip_induction(true);
+
+        // In skip-induction mode, the connector sends a Conclusion directly
+        // with syn_cookie=0 (no induction exchange to obtain a cookie).
+        let mut shake = test_conclusion();
+        shake.syn_cookie = 0;
+
+        let resp = l.handle_packet(
+            Instant::now(),
+            Ok((build_hs_pack(shake), conn_addr())),
+        );
+        assert_matches!(
+            resp,
+            Connected(
+                Some(_),
+                Connection {
+                    handshake: Handshake::Listener(ControlTypes::Handshake(HandshakeControlInfo {
+                        info: HandshakeVsInfo::V5(HsV5Info {
+                            ext_hs: Some(_),
+                            ..
+                        }),
+                        ..
+                    })),
+                    ..
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn skip_induction_rejects_without_flag() {
+        // Without allow_skip_induction, a conclusion-first packet is rejected.
+        let mut l = test_listen();
+
+        let mut shake = test_conclusion();
+        shake.syn_cookie = 0;
+
+        assert_matches!(
+            l.handle_packet(
+                Instant::now(),
+                Ok((build_hs_pack(shake.clone()), conn_addr()))
+            ),
+            NotHandled(ConnectError::InductionExpected(_))
         );
     }
 
