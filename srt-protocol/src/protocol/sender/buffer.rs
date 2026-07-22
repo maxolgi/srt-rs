@@ -96,6 +96,11 @@ impl SendBuffer {
         self.get(self.next_send).is_some() || !self.lost_list.is_empty()
     }
 
+    /// Current smoothed RTT (EWMA) as a Duration. Updated from ACK feedback.
+    pub fn rtt(&self) -> Duration {
+        self.rtt.mean_as_duration()
+    }
+
     pub fn duration(&self) -> Duration {
         match (self.buffer.front(), self.buffer.back()) {
             (Some(f), Some(l)) => Duration::from_micros(

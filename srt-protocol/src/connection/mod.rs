@@ -179,6 +179,7 @@ impl DuplexConnection {
 
         self.stats.rx_acknowledged_time = self.receiver.rx_acknowledged_time();
         self.stats.rx_average_rtt = self.receiver.rtt();
+        self.stats.tx_average_rtt = self.sender.rtt();
         self.stats.rx_acknowledged_data = self.receiver.buffered_packets() as u64;
         self.stats.rx_buffer_available_bytes =
             self.receiver.buffer_available_packets() as u64 * 1316;

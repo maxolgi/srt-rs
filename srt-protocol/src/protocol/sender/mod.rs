@@ -65,6 +65,11 @@ impl Sender {
     pub fn tx_buffered_bytes(&self) -> u64 {
         u64::try_from(self.send_buffer.len_bytes()).unwrap()
     }
+
+    /// Smoothed RTT from the sender's send buffer (updated from ACK feedback).
+    pub fn rtt(&self) -> Duration {
+        self.send_buffer.rtt()
+    }
 }
 
 pub struct SenderContext<'a> {
