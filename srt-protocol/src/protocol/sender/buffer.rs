@@ -58,7 +58,7 @@ impl SendBuffer {
                 settings.send_tsbpd_latency + settings.send_tsbpd_latency / 4, // 125% of TSBPD
                 Duration::from_secs(1),
             ),
-            rtt: Rtt::default(),
+            rtt: Rtt::from_mean_duration(settings.rtt),
             rto_queue: Default::default(),
         }
     }
@@ -206,6 +206,18 @@ impl SendBuffer {
 
     fn send_next_lost_packet(&mut self, ts_now: TimeStamp) -> Option<DataPacket> {
         let seq = self.pop_lost_list()?;
+
+        // CC-aware retransmit skip: if the predicted arrival (now + RTT)
+        // exceeds the TSBPD deadline, don't waste bandwidth retransmitting —
+        // the receiver will drop it as too-late anyway.
+        // (draft-sharabayko-srt-over-quic §4.5)
+        if let Some(entry) = self.get(seq) {
+            let deadline = entry.packet.timestamp + self.latency_window;
+            if ts_now + self.rtt.mean() > deadline {
+                return None;
+            }
+        }
+
         match self
             .send_packet(ts_now, seq)
         {
