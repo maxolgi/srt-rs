@@ -23,6 +23,10 @@ pub struct ConnInitSettings {
     pub send_buffer_size: options::PacketCount,
     pub max_packet_size: options::PacketSize,
     pub max_flow_size: options::PacketCount,
+    /// Initial RTT estimate to seed the connection's EWMA, instead of the
+    /// 10 ms default. When set, overrides the handshake-measured RTT (which
+    /// is ~0 for skip-induction). Used to seed SendBuffer and ARQ.
+    pub initial_rtt: Option<Duration>,
 }
 
 impl Default for ConnInitSettings {
@@ -69,6 +73,7 @@ impl From<options::SocketOptions> for ConnInitSettings {
             max_packet_size: options.sender.max_payload_size,
             max_flow_size: options.sender.flow_control_window_size,
             too_late_packet_drop: options.receiver.too_late_packet_drop,
+            initial_rtt: None,
         }
     }
 }

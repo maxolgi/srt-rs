@@ -104,7 +104,7 @@ pub fn gen_access_control_response(
         None
     };
 
-    let rtt = now - induction_time;
+    let rtt = settings.initial_rtt.unwrap_or(now - induction_time);
 
     GenHsv5Result::Accept(
         HandshakeVsInfo::V5(HsV5Info {
@@ -225,7 +225,7 @@ impl StartedInitiator {
         // validate response
         Ok(ConnectionSettings {
             remote: from,
-            rtt: now - self.initiate_time,
+            rtt: self.settings.initial_rtt.unwrap_or(now - self.initiate_time),
             socket_start_time: self.initiate_time,
             init_seq_num: response.init_seq_num,
             remote_sockid: response.socket_id,

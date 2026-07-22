@@ -178,6 +178,7 @@ impl AutomaticRepeatRequestAlgorithm {
         too_late_packet_drop: bool,
         init_seq_num: SeqNumber,
         buffer_size_packets: PacketCount,
+        initial_rtt: Duration,
     ) -> Self {
         Self {
             link_capacity_estimate: LinkCapacityEstimate::new(),
@@ -190,7 +191,7 @@ impl AutomaticRepeatRequestAlgorithm {
                 buffer_size_packets,
             ),
             ack_history_window: AckHistoryWindow::new(tsbpd_latency, init_seq_num),
-            rtt: Rtt::default(),
+            rtt: Rtt::from_mean_duration(initial_rtt),
         }
     }
 
@@ -378,6 +379,7 @@ mod automatic_repeat_request_algorithm {
             true,
             init_seq_num,
             PacketCount(8192),
+            Duration::from_millis(10),
         );
 
         assert_eq!(arq.on_full_ack_event(start), None);
@@ -436,6 +438,7 @@ mod automatic_repeat_request_algorithm {
             true,
             init_seq_num,
             PacketCount(8192),
+            Duration::from_millis(10),
         );
 
         assert_eq!(
@@ -469,7 +472,7 @@ mod automatic_repeat_request_algorithm {
             Some(Acknowledgement::Full(
                 init_seq_num + 2,
                 AckStatistics {
-                    rtt: Rtt::default(),
+                    rtt: Rtt::from_mean_duration(Duration::from_millis(10)),
                     buffer_available: 8190,
                     packet_receive_rate: None,
                     estimated_link_capacity: None,
@@ -505,6 +508,7 @@ mod automatic_repeat_request_algorithm {
             true,
             init_seq_num,
             PacketCount(8192),
+            Duration::from_millis(10),
         );
 
         let _ = arq.handle_data_packet(
@@ -548,6 +552,7 @@ mod automatic_repeat_request_algorithm {
             true,
             init_seq_num,
             PacketCount(8192),
+            Duration::from_millis(10),
         );
 
         let _ = arq.handle_data_packet(
@@ -564,7 +569,7 @@ mod automatic_repeat_request_algorithm {
             Some(Acknowledgement::Full(
                 init_seq_num + 1,
                 AckStatistics {
-                    rtt: Rtt::default(),
+                    rtt: Rtt::from_mean_duration(Duration::from_millis(10)),
                     buffer_available: 8191,
                     packet_receive_rate: None,
                     estimated_link_capacity: None,
@@ -600,6 +605,7 @@ mod automatic_repeat_request_algorithm {
             true,
             init_seq_num,
             PacketCount(8192),
+            Duration::from_millis(10),
         );
 
         let now = start;

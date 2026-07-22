@@ -22,6 +22,15 @@ impl Rtt {
         Self { mean, variance }
     }
 
+    /// Create an Rtt from a Duration, with variance estimated as mean/4
+    /// (matching the RFC 6298 variance/mean ratio for initial estimates).
+    pub fn from_mean_duration(mean: Duration) -> Self {
+        Self {
+            mean: TimeSpan::from_micros(mean.as_micros() as i32),
+            variance: TimeSpan::from_micros((mean.as_micros() / 4) as i32),
+        }
+    }
+
     pub fn update(&mut self, rtt: TimeSpan) {
         self.mean = TimeSpan::from_micros(
             ((self.mean.as_micros() as i64 * 7 + rtt.as_micros() as i64) / 8) as i32,
